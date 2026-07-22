@@ -1,34 +1,29 @@
 <?php
 session_start();
+include("db.php"); 
 
-// Redirect if not logged in
 if(!isset($_SESSION['student'])) {
     header("Location: student_login.php");
     exit();
 }
 
-include("db.php"); 
-
-// $_SESSION['student'] should contain the ID of the student (e.g., 1)
 $id = $_SESSION['student'];
 
-// FIX: Changed 'student_id' to 'id' to match the table structure
+// Fetch Student Name
 $query = "SELECT name FROM student WHERE id='$id'";
 $result = mysqli_query($conn, $query);
+$studentName = ($result && $row = mysqli_fetch_assoc($result)) ? $row['name'] : "Student";
 
-if($result && $row = mysqli_fetch_assoc($result)){
-    $studentName = $row['name'];
-} else {
-    $studentName = "Student";
-}
+// Fetch Counts
+$paperCount = ($res = $conn->query("SELECT COUNT(*) as total FROM question_bank")) ? $res->fetch_assoc()['total'] : 0;
+$materialCount = ($res = $conn->query("SELECT COUNT(*) as total FROM study_materials")) ? $res->fetch_assoc()['total'] : 0;
 
-// Fetch counts for the stats section
-// Added error suppression (@) or default 0 to prevent crashes if tables are empty
-$paperResult = $conn->query("SELECT COUNT(*) as total FROM question_bank");
-$paperCount = ($paperResult) ? mysqli_fetch_assoc($paperResult)['total'] : 0;
+// Fetch Notifications Count (Unread)
+$notifCountQuery = "SELECT COUNT(*) as total FROM notifications WHERE (student_id = '$id' OR student_id IS NULL) AND is_read = 0";
+$notifCount = ($res = $conn->query($notifCountQuery)) ? $res->fetch_assoc()['total'] : 0;
 
-$materialResult = $conn->query("SELECT COUNT(*) as total FROM study_materials");
-$materialCount = ($materialResult) ? mysqli_fetch_assoc($materialResult)['total'] : 0;
+// Fetch Latest 5 Notifications
+$notifications = $conn->query("SELECT * FROM notifications WHERE (student_id = '$id' OR student_id IS NULL) ORDER BY created_at DESC LIMIT 5");
 ?>
 
 <!DOCTYPE html>
@@ -36,220 +31,251 @@ $materialCount = ($materialResult) ? mysqli_fetch_assoc($materialResult)['total'
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Dashboard | Zeal EduHub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Student Dashboard | ZEALHUB</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
         :root {
-            --primary: #4361ee;
-            --primary-dark: #3f37c9;
-            --sidebar-bg: #0f172a;
-            --bg-light: #f8fafc;
-            --text-dark: #1e293b;
-            --text-muted: #64748b;
-            --glass: rgba(255, 255, 255, 0.9);
+            --primary: #4361ee; --bg: #f3f4f9; --header-bg: #ffffff;
+            --sidebar-bg: #ffffff; --card-bg: #ffffff; --text-main: #1e293b;
+            --text-muted: #64748b; --border: #e2e8f0; --glow: rgba(67, 97, 238, 0.4);
+            --danger: #ef4444;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        
-        body { background: var(--bg-light); color: var(--text-dark); overflow-x: hidden; }
+        [data-theme="dark"] {
+            --bg: #0f172a; --header-bg: #0f172a; --sidebar-bg: #1e293b;
+            --card-bg: #1e293b; --text-main: #f1f5f9; --text-muted: #94a3b8;
+            --border: #334155; --glow: rgba(67, 97, 238, 0.6);
+        }
 
-        /* --- Header --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.3s ease; }
+        body { background: var(--bg); color: var(--text-main); overflow: hidden; }
+
+        /* --- HEADER --- */
         .header {
-            position: fixed; top: 0; left: 0; right: 0; height: 70px;
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(12px);
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0 30px; z-index: 1001;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            height: 75px; background: var(--header-bg); border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; padding: 0 25px;
+            position: fixed; top: 0; width: 100%; z-index: 1000;
         }
-        .logo { font-size: 22px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 10px; }
-        .profile-area { display: flex; align-items: center; gap: 15px; background: #fff; padding: 5px 15px; border-radius: 50px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .profile-area span { font-weight: 600; font-size: 14px; }
-        .profile-area img { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .menu-btn { background: var(--primary); color: white; border: none; width: 40px; height: 40px; border-radius: 10px; cursor: pointer; }
+        .logo { font-size: 22px; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 8px; }
 
-        /* --- Sidebar --- */
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .icon-btn { 
+            background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); 
+            width: 40px; height: 40px; border-radius: 12px; cursor: pointer; position: relative;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .icon-btn:hover { background: var(--primary); color: white; }
+        
+        /* Notification Badge */
+        .badge {
+            position: absolute; top: -5px; right: -5px; background: var(--danger);
+            color: white; font-size: 10px; padding: 2px 6px; border-radius: 50%;
+            border: 2px solid var(--header-bg); font-weight: 800;
+        }
+
+        /* Notification Dropdown */
+        .notif-dropdown {
+            position: absolute; top: 70px; right: 80px; width: 320px; background: var(--card-bg);
+            border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: none; z-index: 1001; overflow: hidden;
+        }
+        .notif-dropdown.show { display: block; animation: slideDown 0.3s ease; }
+        .notif-header { padding: 15px; border-bottom: 1px solid var(--border); font-weight: 700; display: flex; justify-content: space-between; }
+        .notif-item { padding: 12px 15px; border-bottom: 1px solid var(--border); cursor: pointer; text-decoration: none; display: block; color: inherit; }
+        .notif-item:hover { background: rgba(67, 97, 238, 0.05); }
+        .notif-item p { font-size: 12px; margin-top: 3px; }
+        .notif-item small { font-size: 10px; color: var(--text-muted); }
+
+        /* --- SIDEBAR --- */
         .sidebar {
-            position: fixed; left: 0; top: 70px; width: 260px; height: calc(100vh - 70px);
-            background: var(--sidebar-bg); color: #fff; padding: 25px 15px;
-            transition: 0.3s ease; z-index: 1000;
+            width: 80px; height: 100vh; background: var(--sidebar-bg); border-right: 1px solid var(--border);
+            position: fixed; top: 75px; left: 0; padding-top: 20px; display: flex; flex-direction: column; align-items: center; z-index: 999;
         }
-        .sidebar ul { list-style: none; }
-        .sidebar ul li { margin-bottom: 8px; }
-        .sidebar ul li a {
-            color: #94a3b8; text-decoration: none; padding: 12px 15px;
-            display: flex; align-items: center; gap: 12px; border-radius: 10px;
-            font-weight: 500; transition: 0.3s;
-        }
-        .sidebar ul li a:hover, .sidebar ul li.active a {
-            background: rgba(255,255,255,0.1); color: #fff;
-        }
-        .sidebar ul li.active a { background: var(--primary); }
+        .sidebar.expanded { width: 260px; align-items: flex-start; padding-left: 20px; }
+        .sidebar a { color: var(--text-muted); text-decoration: none; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; margin-bottom: 15px; border-radius: 12px; }
+        .sidebar.expanded a { width: 90%; justify-content: flex-start; padding-left: 15px; }
+        .sidebar a span { display: none; font-size: 15px; font-weight: 600; margin-left: 15px; }
+        .sidebar.expanded a span { display: inline; }
+        .sidebar a:hover, .sidebar a.active { background: var(--primary); color: white !important; box-shadow: 0 0 15px var(--glow); }
 
-        /* --- Main Content --- */
-        .main { margin-left: 260px; padding: 100px 40px 40px; min-height: 100vh; }
+        /* --- MAIN CONTENT --- */
+        .main-content { margin-left: 80px; margin-top: 75px; padding: 30px; height: calc(100vh - 75px); overflow-y: auto; }
+        .main-content.pushed { margin-left: 260px; }
 
-        /* Hero Section */
-        .hero {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            border-radius: 24px; padding: 50px; color: #fff;
-            display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 20px 40px rgba(67, 97, 238, 0.2); margin-bottom: 35px;
-        }
-        .hero h1 { font-size: 32px; font-weight: 800; margin-bottom: 10px; }
-        .hero p { opacity: 0.9; font-size: 16px; max-width: 500px; }
+        .stats-grid, .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card, .action-btn { background: var(--card-bg); padding: 20px; border-radius: 20px; border: 1px solid var(--border); display: flex; align-items: center; gap: 15px; text-decoration: none; color: inherit; }
+        .action-btn { flex-direction: column; text-align: center; padding: 25px; }
+        .action-btn:hover { border-color: var(--primary); box-shadow: 0 0 20px var(--glow); transform: translateY(-5px); }
+        .icon-box { width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
 
-        /* Stats Grid */
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 35px; }
-        .stat-card { background: #fff; padding: 20px; border-radius: 18px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
-        .stat-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .stat-card h2 { font-size: 24px; font-weight: 700; }
-        .stat-card p { color: var(--text-muted); font-size: 13px; font-weight: 500; }
-
-        /* Feature Cards */
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
-        .card {
-            background: #fff; padding: 30px; border-radius: 22px; border: 1px solid #f1f5f9;
-            transition: 0.3s; cursor: pointer; text-decoration: none; display: block;
-        }
-        .card:hover { transform: translateY(-8px); box-shadow: 0 20px 30px rgba(0,0,0,0.05); border-color: var(--primary); }
-        .card i { font-size: 30px; color: var(--primary); margin-bottom: 20px; }
-        .card h3 { color: var(--text-dark); margin-bottom: 10px; font-size: 18px; }
-        .card p { color: var(--text-muted); font-size: 14px; line-height: 1.6; }
-
-        /* Recent Activity */
-        .recent-box { background: #fff; margin-top: 40px; padding: 30px; border-radius: 22px; border: 1px solid #f1f5f9; }
-        .recent-box h2 { font-size: 20px; margin-bottom: 20px; }
-        .activity-item { padding: 15px 0; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 15px; }
-        .activity-item:last-child { border: none; }
-        .dot { height: 8px; width: 8px; background: var(--primary); border-radius: 50%; }
-
-        /* Footer */
-        .footer { margin-left: 260px; padding: 30px; text-align: center; color: var(--text-muted); font-size: 14px; border-top: 1px solid #e2e8f0; }
-
-        @media (max-width: 992px) {
-            .sidebar { left: -260px; }
-            .main, .footer { margin-left: 0; padding: 100px 20px 20px; }
-            .hero { flex-direction: column; text-align: center; padding: 30px; }
-            .hero img { display: none; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body>
+<body data-theme="light">
 
 <header class="header">
-    <div class="logo"><i class="fa-solid fa-graduation-cap"></i>ZEALHUB</div>
-    <div class="profile-area">
-        <span>Hi, <?= htmlspecialchars($studentName) ?></span>
-        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Profile">
+    <div class="header-left">
+        <button class="menu-btn" id="menuBtn"><i class="fa-solid fa-bars"></i></button>
+        <a href="#" class="logo"><i class="fa-solid fa-graduation-cap"></i> ZEALHUB</a>
+    </div>
+    <div class="header-right">
+        <!-- Notification Button -->
+        <div style="position: relative;">
+            <button class="icon-btn" id="notifBtn">
+                <i class="fa-solid fa-bell"></i>
+                <?php if($notifCount > 0): ?>
+                    <span class="badge"><?= $notifCount ?></span>
+                <?php endif; ?>
+            </button>
+            <!-- Dropdown -->
+            <div class="notif-dropdown" id="notifDropdown">
+                <div class="notif-header">
+                    <span>Notifications</span>
+                    <a href="mark_all_read.php" style="font-size: 11px; color: var(--primary); text-decoration: none;">Mark all read</a>
+                </div>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <?php if($notifications->num_rows > 0): ?>
+                        <?php while($n = $notifications->fetch_assoc()): ?>
+                            <a href="#" class="notif-item">
+                                <strong style="font-size: 13px;"><?= htmlspecialchars($n['title']) ?></strong>
+                                <p style="color: var(--text-muted);"><?= htmlspecialchars($n['message']) ?></p>
+                                <small><i class="fa-regular fa-clock"></i> <?= date('M d, h:i A', strtotime($n['created_at'])) ?></small>
+                            </a>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No new notifications</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <button class="icon-btn" id="themeBtn"><i class="fa-solid fa-moon" id="themeIcon"></i></button>
+        
+        <a href="profile.php" style="display: flex; align-items: center; gap: 12px; padding: 6px 15px; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg); text-decoration: none; color: inherit;">
+            <div style="text-align: right;">
+                <p style="font-size: 11px; font-weight: 800;"><?= htmlspecialchars($studentName) ?></p>
+                <p style="font-size: 9px; color: var(--text-muted);">STUDENT</p>
+            </div>
+            <div style="width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">ST</div>
+        </a>
     </div>
 </header>
 
-<aside class="sidebar">
-    <ul>
-        <li class="active"><a href="student_dashboard.php"><i class="fa-solid fa-gauge"></i> Dashboard</a></li>
-        <li><a href="profile.php"><i class="fa-solid fa-user"></i> My Profile</a></li>
-        <li><a href="student_questionbank.php"><i class="fa-solid fa-file-pdf"></i> Question Bank</a></li>
-        <li><a href="student_syllabus.php"><i class="fa-solid fa-book"></i> Syllabus</a></li>
-        <li><a href="student_study_material.php" onclick="comingSoon()"><i class="fa-solid fa-book"></i> Study Material</a></li>
-         <li><a href="student_raise_query.php"><i class="fa-solid fa-user"></i>  Raise query</a></li>
-        <li><a href="student_lab.php" onclick="comingSoon()"><i class="fa-solid fa-laptop-code"></i> Lab Practice</a></li>
-        <li><a href="student_logout.php" style="color: #f87171;"><i class="fa-solid fa-power-off"></i> Logout</a></li>
-    </ul>
+<aside class="sidebar" id="sidebar">
+    <a href="student_dashboard.php" class="active"><i class="fa-solid fa-house"></i> <span>Dashboard</span></a>
+    <a href="student_questionbank.php"><i class="fa-solid fa-file-pdf"></i> <span>Question Bank</span></a>
+    <a href="student_study_material.php"><i class="fa-solid fa-book-open"></i> <span>Materials</span></a>
+    <a href="student_syllabus.php"><i class="fa-solid fa-scroll"></i> <span>Syllabus</span></a>
+    <a href="student_raise_query.php"><i class="fa-solid fa-clipboard-question"></i> <span>Queries</span></a>
+    <a href="student_logout.php" style="margin-top: auto; color: #ef4444; margin-bottom: 30px;"><i class="fa-solid fa-power-off"></i> <span>Logout</span></a>
 </aside>
 
-<main class="main">
-    <section class="hero">
-        <div>
-            <h1>Welcome Back, <?= htmlspecialchars($studentName) ?>! 👋</h1>
-            <p>Your centralized portal for study materials, syllabus updates, and university previous year question papers.</p>
-        </div>
-        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135755.png" width="140" style="filter: brightness(0) invert(1);">
-    </section>
+<main class="main-content" id="mainContent">
+    <div style="margin-bottom: 30px;">
+        <h1 id="greeting">Welcome</h1>
+        <p style="color: var(--text-muted);">Your academic command center is ready.</p>
+    </div>
 
-    <section class="stats-grid">
+    <!-- Stats -->
+    <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #e0e7ff; color: #4361ee;"><i class="fa-solid fa-file-lines"></i></div>
-            <div>
-                <h2><?= $paperCount ?></h2>
-                <p>Question Papers</p>
-            </div>
+            <div class="icon-box" style="background: rgba(67, 97, 238, 0.1); color: var(--primary);"><i class="fa-solid fa-file-lines"></i></div>
+            <div><p style="font-size: 11px; color: var(--text-muted);">PAPERS</p><h2><?= $paperCount ?></h2></div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #fef3c7; color: #d97706;"><i class="fa-solid fa-book"></i></div>
-            <div>
-                <h2><?= $materialCount ?></h2>
-                <p>Study Notes</p>
-            </div>
+            <div class="icon-box" style="background: rgba(16, 185, 129, 0.1); color: #10b981;"><i class="fa-solid fa-book"></i></div>
+            <div><p style="font-size: 11px; color: var(--text-muted);">NOTES</p><h2><?= $materialCount ?></h2></div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #dcfce7; color: #16a34a;"><i class="fa-solid fa-check-double"></i></div>
-            <div>
-                <h2>100%</h2>
-                <p>Verified Content</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #fee2e2; color: #dc2626;"><i class="fa-solid fa-clock"></i></div>
-            <div>
-                <h2>24/7</h2>
-                <p>Access</p>
-            </div>
-        </div>
-    </section>
-
-    <div class="grid">
-        <a href="student_questionbank.php" class="card">
-            <i class="fa-solid fa-circle-question"></i>
-            <h3>Question Bank</h3>
-            <p>Access subject-wise important questions and model papers for exam prep.</p>
-        </a>
-
-        <div class="card" onclick="comingSoon()">
-            <i class="fa-solid fa-book-open"></i>
-            <h3>Study Material</h3>
-            <p>Download PDFs, PPTs, and handwritten notes uploaded by the faculty.</p>
-        </div>
-
-        <div class="card" onclick="comingSoon()">
-            <i class="fa-solid fa-scroll"></i>
-            <h3>Syllabus</h3>
-            <p>Stay updated with the latest University curriculum and course outcomes.</p>
+        <!-- Notification Stat Card -->
+        <div class="stat-card" style="cursor:pointer;" onclick="document.getElementById('notifBtn').click()">
+            <div class="icon-box" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);"><i class="fa-solid fa-bell"></i></div>
+            <div><p style="font-size: 11px; color: var(--text-muted);">ALERTS</p><h2><?= $notifCount ?></h2></div>
         </div>
     </div>
 
-    <div class="recent-box">
-        <h2><i class="fa-solid fa-clock-rotate-left"></i> Recent Portal Updates</h2>
-        <div class="activity-item">
-            <div class="dot"></div>
-            <span>New <b>Database Management</b> papers added to Question Bank.</span>
+    <h3 style="margin-bottom: 15px;">Quick Access</h3>
+    <div class="action-grid">
+        <a href="student_questionbank.php" class="action-btn">
+            <i class="fa-solid fa-file-circle-question" style="font-size: 30px; color: var(--primary); margin-bottom: 10px;"></i>
+            <span>Question Bank</span>
+        </a>
+        <a href="student_study_material.php" class="action-btn">
+            <i class="fa-solid fa-file-pdf" style="font-size: 30px; color: var(--primary); margin-bottom: 10px;"></i>
+            <span>Study Material</span>
+        </a>
+        <a href="student_syllabus.php" class="action-btn">
+            <i class="fa-solid fa-list-ul" style="font-size: 30px; color: var(--primary); margin-bottom: 10px;"></i>
+            <span>Syllabus</span>
+        </a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+        <div style="background: var(--card-bg); padding: 25px; border-radius: 24px; border: 1px solid var(--border);">
+            <h3 style="color: var(--primary); margin-bottom: 15px;">Portal Updates</h3>
+            <p>Access all semester-wise resources. New features like query replies and material alerts are now live.</p>
         </div>
-        <div class="activity-item">
-            <div class="dot"></div>
-            <span><b>Java Programming</b> Unit-3 notes are now available.</span>
-        </div>
-        <div class="activity-item">
-            <div class="dot"></div>
-            <span>System Maintenance scheduled for Sunday at 10:00 PM.</span>
+
+        <!-- Dashboard Notification Feed -->
+        <div style="background: var(--card-bg); padding: 20px; border-radius: 24px; border: 1px solid var(--border);">
+            <h4 style="margin-bottom: 15px;"><i class="fa-solid fa-bullhorn" style="color:var(--primary)"></i> Recent Notifications</h4>
+            <?php 
+            $notifications->data_seek(0); // Reset pointer
+            if($notifications->num_rows > 0): 
+                while($n = $notifications->fetch_assoc()): ?>
+                <div style="padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;">
+                    <strong><?= $n['title'] ?></strong>
+                    <p style="font-size: 11px; color: var(--text-muted);"><?= $n['message'] ?></p>
+                </div>
+            <?php endwhile; else: ?>
+                <p style="font-size: 12px; color: var(--text-muted);">No notifications yet.</p>
+            <?php endif; ?>
         </div>
     </div>
 </main>
 
-<footer class="footer">
-    <p>© 2026 Zeal EduHub - Department of Information Technology</p>
-</footer>
-
 <script>
-function comingSoon() {
-    Swal.fire({
-        title: 'Feature Coming Soon',
-        text: 'This module is currently being updated by our IT team. Please check back later!',
-        icon: 'info',
-        confirmButtonColor: '#4361ee'
+    // Sidebar logic
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    menuBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('expanded');
+        mainContent.classList.toggle('pushed');
     });
-}
+
+    // Notification Dropdown toggle
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    notifBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        notifDropdown.classList.toggle('show');
+    });
+    document.addEventListener('click', () => notifDropdown.classList.remove('show'));
+
+    // Theme logic
+    const themeBtn = document.getElementById('themeBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    const currentTheme = localStorage.getItem('theme') || 'light';
+    document.body.setAttribute('data-theme', currentTheme);
+    themeIcon.className = (currentTheme === 'dark') ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+
+    themeBtn.addEventListener('click', () => {
+        let theme = document.body.getAttribute('data-theme');
+        let newTheme = (theme === 'light') ? 'dark' : 'light';
+        document.body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        themeIcon.className = (newTheme === 'dark') ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    });
+
+    // Greeting
+    const hour = new Date().getHours();
+    const student = "<?= htmlspecialchars($studentName) ?>";
+    let greet = (hour < 12) ? "Good Morning" : (hour < 17) ? "Good Afternoon" : "Good Evening";
+    document.getElementById('greeting').innerText = `${greet}, ${student}! 👋`;
 </script>
 
 </body>
