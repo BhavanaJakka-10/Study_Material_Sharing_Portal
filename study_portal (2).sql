@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 21, 2026 at 10:00 AM
+-- Generation Time: Jul 22, 2026 at 08:16 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -154,9 +154,12 @@ INSERT INTO `lab_records` (`record_id`, `student_name`, `language`, `program_tit
 --
 
 CREATE TABLE `notifications` (
-  `notification_id` int(11) NOT NULL,
-  `title` varchar(200) DEFAULT NULL,
+  `id` int(11) NOT NULL,
+  `student_id` int(11) DEFAULT NULL,
+  `title` varchar(255) DEFAULT NULL,
   `message` text DEFAULT NULL,
+  `type` varchar(50) DEFAULT NULL,
+  `is_read` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -208,7 +211,8 @@ INSERT INTO `portal_activity` (`id`, `user_name`, `user_role`, `action_type`, `m
 (6, 'Chanvir shivputmadar', 'Staff', 'Upload', 'Uploaded Question Bank: jhd (ywgd - jehw)', '2026-07-20 08:36:57'),
 (7, 'Chanvir  jamadar', 'Staff', 'Delete', 'Deleted material: chapter 2', '2026-07-20 09:37:43'),
 (8, 'Chanvir  jamadar', 'Staff', 'Delete', 'Deleted Question Bank item: jhd', '2026-07-20 09:37:53'),
-(9, 'Chanvir  jamadar', 'Staff', 'Delete', 'Deleted Question Bank item: mid term question paper', '2026-07-20 09:37:57');
+(9, 'Chanvir  jamadar', 'Staff', 'Delete', 'Deleted Question Bank item: mid term question paper', '2026-07-20 09:37:57'),
+(10, 'Admin Staff', 'Staff', 'Upload', 'Uploaded Question Bank: qb (math - 2026)', '2026-07-21 17:57:02');
 
 -- --------------------------------------------------------
 
@@ -284,7 +288,8 @@ CREATE TABLE `question_bank` (
 --
 
 INSERT INTO `question_bank` (`id`, `subject`, `year`, `title`, `description`, `file_name`, `upload_date`) VALUES
-(1, 'MATH PART 2', '2026', 'unit1 ', 'qb', '1784488651_Unit 3 Question bank.pdf', '2026-07-19 19:17:31');
+(1, 'MATH PART 2', '2026', 'unit1 ', 'qb', '1784488651_Unit 3 Question bank.pdf', '2026-07-19 19:17:31'),
+(8, 'math', '2026', 'qb', 'add', '1784656622_qb.pdf', '2026-07-21 17:57:02');
 
 -- --------------------------------------------------------
 
@@ -329,8 +334,8 @@ CREATE TABLE `staff_profile` (
   `name` varchar(100) NOT NULL,
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `mobile_no` varchar(20) DEFAULT NULL,
+  `phone` varchar(10) DEFAULT NULL,
+  `mobile_no` varchar(10) DEFAULT NULL,
   `qualification` varchar(255) DEFAULT NULL,
   `department` varchar(100) DEFAULT NULL,
   `designation` varchar(100) DEFAULT NULL,
@@ -339,15 +344,22 @@ CREATE TABLE `staff_profile` (
   `address` text DEFAULT NULL,
   `photo` varchar(255) DEFAULT NULL,
   `reset_token` varchar(255) DEFAULT NULL,
-  `token_expiry` datetime DEFAULT NULL
+  `token_expiry` datetime DEFAULT NULL,
+  `Subject` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `staff_profile`
 --
 
-INSERT INTO `staff_profile` (`id`, `staff_id`, `name`, `email`, `password`, `phone`, `mobile_no`, `qualification`, `department`, `designation`, `gender`, `dob`, `address`, `photo`, `reset_token`, `token_expiry`) VALUES
-(1, 'S001', 'Admin Staff', 'shivputrajamadar@gmail.com', '1234567', '90219243', NULL, NULL, 'IT Department', 'Senior Manager', 'Male', '1999-05-11', 'ganganagr, phurusungi, pune-412308', '1784606758_IMG_20260219_132131706.jpg', NULL, NULL);
+INSERT INTO `staff_profile` (`id`, `staff_id`, `name`, `email`, `password`, `phone`, `mobile_no`, `qualification`, `department`, `designation`, `gender`, `dob`, `address`, `photo`, `reset_token`, `token_expiry`, `Subject`) VALUES
+(1, 'S001', 'Chanvir jamadar', 'shivputrajamadar057@gmail.com', '1234567', '90219243', '96998072', NULL, 'IT Department', 'Senior Manager', 'Male', '1999-05-11', 'ganganagr, phurusungi, pune-412308', '1784606758_IMG_20260219_132131706.jpg', '9837da01a01db02a3e42b6991c46f0483364ee6c97634ef08aae05b24c4cad9b', '2026-07-21 22:28:33', ''),
+(2, 'S002', 'Bhavana Jakka ', 'bhavanajakka10@gmail.com', 'Bhavana2', '1234567890', '0987654321', 'M.Sc', 'IT', 'Teacher', 'Female', '2026-07-01', 'Narhegaon,katraj,pune-422092 ', NULL, NULL, NULL, 'CPP'),
+(3, 'S003', 'Sumit Kale', 'sumitkale3008@gmail.com', 'Sumit3', '0987654321', '1234567899', 'M.Sc', 'IT', 'Teacher', 'Male', '2026-07-13', 'Narhegaon,katraj,pune-422092 ', NULL, NULL, NULL, 'Physics'),
+(4, 'S004', 'Wrushab sirsat', 'wrushab.sirsat@zealeducation.com', 'Wrushab4', '8551982198', '9699807254', 'M.Tech', 'IT', 'HOD', 'Male', '2007-08-22', 'PUNE', NULL, NULL, NULL, 'JAVA'),
+(5, 'S005', 'Balaji chaugule', 'balaji.chaugule@zealeducation.com', 'Balaji5', '9021924376', '96998073', 'M.Tech', 'IT', 'PRINCIPAL', 'Male', '2007-08-22', 'PUNE', NULL, NULL, NULL, 'PYTHON'),
+(6, 'SOO6', 'Shubham Kundurke', 'internshipzeal@gmail.com', 'Shubham6', '90219243', '96998072', 'B.Tech', 'IT', 'PROFESSOR', 'Male', '2016-08-22', 'OUNE', NULL, NULL, NULL, 'MATH'),
+(7, 'SOO7', 'Yash Jadhav', 'yj64003@gmail.com', 'Yash7', '9021924376', '96998072', 'M.TECH', 'IT', 'SENIOR FACULTY ', 'Male', '2016-08-22', 'PUNE', NULL, NULL, NULL, 'CHEM');
 
 -- --------------------------------------------------------
 
@@ -567,21 +579,12 @@ CREATE TABLE `student_queries` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
-
 --
--- Table structure for table `study_material`
+-- Dumping data for table `student_queries`
 --
 
-CREATE TABLE `study_material` (
-  `material_id` int(11) NOT NULL,
-  `subject_id` int(11) DEFAULT NULL,
-  `title` varchar(200) DEFAULT NULL,
-  `description` text DEFAULT NULL,
-  `file_path` varchar(255) DEFAULT NULL,
-  `uploaded_by` int(11) DEFAULT NULL,
-  `upload_date` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+INSERT INTO `student_queries` (`query_id`, `student_id`, `student_name`, `subject`, `message`, `staff_reply`, `status`, `created_at`) VALUES
+(1, '123', 'Yash Vinodbhai Jadhav', 'Study Material', 'it will not seen', 'ok i will see', 'Resolved', '2026-07-21 18:23:19');
 
 -- --------------------------------------------------------
 
@@ -594,7 +597,8 @@ CREATE TABLE `study_materials` (
   `subject` varchar(100) NOT NULL,
   `title` varchar(200) NOT NULL,
   `description` text DEFAULT NULL,
-  `file_name` varchar(255) NOT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `uploaded_by` varchar(100) NOT NULL,
   `upload_date` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -602,8 +606,9 @@ CREATE TABLE `study_materials` (
 -- Dumping data for table `study_materials`
 --
 
-INSERT INTO `study_materials` (`id`, `subject`, `title`, `description`, `file_name`, `upload_date`) VALUES
-(4, 'MATH PART 2', 'unit 3', 'notes ', '1784520962_unit 3 notes.pdf', '2026-07-20 04:16:02');
+INSERT INTO `study_materials` (`id`, `subject`, `title`, `description`, `file_path`, `uploaded_by`, `upload_date`) VALUES
+(12, 'Data Structures', '1', NULL, 'uploads/materials/1784693696_1.pdf', 'S001', '2026-07-22 04:14:56'),
+(13, 'Data Structures', '1', NULL, 'uploads/materials/1784698324_1.pdf', 'S002', '2026-07-22 05:32:04');
 
 -- --------------------------------------------------------
 
@@ -715,7 +720,7 @@ ALTER TABLE `lab_records`
 -- Indexes for table `notifications`
 --
 ALTER TABLE `notifications`
-  ADD PRIMARY KEY (`notification_id`);
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `password_reset`
@@ -825,14 +830,6 @@ ALTER TABLE `student_queries`
   ADD PRIMARY KEY (`query_id`);
 
 --
--- Indexes for table `study_material`
---
-ALTER TABLE `study_material`
-  ADD PRIMARY KEY (`material_id`),
-  ADD KEY `subject_id` (`subject_id`),
-  ADD KEY `uploaded_by` (`uploaded_by`);
-
---
 -- Indexes for table `study_materials`
 --
 ALTER TABLE `study_materials`
@@ -873,6 +870,12 @@ ALTER TABLE `lab_records`
   MODIFY `record_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `notifications`
+--
+ALTER TABLE `notifications`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `password_reset`
 --
 ALTER TABLE `password_reset`
@@ -882,7 +885,7 @@ ALTER TABLE `password_reset`
 -- AUTO_INCREMENT for table `portal_activity`
 --
 ALTER TABLE `portal_activity`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `practice_questions`
@@ -894,13 +897,13 @@ ALTER TABLE `practice_questions`
 -- AUTO_INCREMENT for table `question_bank`
 --
 ALTER TABLE `question_bank`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `staff_profile`
 --
 ALTER TABLE `staff_profile`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `student`
@@ -918,13 +921,13 @@ ALTER TABLE `student_code`
 -- AUTO_INCREMENT for table `student_queries`
 --
 ALTER TABLE `student_queries`
-  MODIFY `query_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `query_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `study_materials`
 --
 ALTER TABLE `study_materials`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `subjects`
